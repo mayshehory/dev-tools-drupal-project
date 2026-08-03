@@ -18,12 +18,14 @@ echo "Starting restore..."
 echo "===================================="
 
 if [ ! -f "$DB_BACKUP" ]; then
-    echo "Error: database backup file was not found."
+    echo "Error: database backup file was not found:"
+    echo "$DB_BACKUP"
     exit 1
 fi
 
 if [ ! -f "$FILES_BACKUP" ]; then
-    echo "Error: Drupal files backup was not found."
+    echo "Error: Drupal files backup was not found:"
+    echo "$FILES_BACKUP"
     exit 1
 fi
 
@@ -36,17 +38,18 @@ docker run --rm \
     -v "$DRUPAL_VOLUME":/volume \
     -v "$(pwd)/backup":/backup \
     alpine \
-    sh -c "rm -rf /volume/* && tar xzf /backup/drupal_files_backup.tar.gz -C /volume"
+    sh -c "rm -rf /volume/* /volume/.[!.]* /volume/..?* 2>/dev/null || true; \
+           tar xzf /backup/drupal_files_backup.tar.gz -C /volume"
 
 echo "Drupal files restored."
 
 echo "Restoring PostgreSQL database..."
 
 docker exec "$POSTGRES_CONTAINER" \
-    sh -c "dropdb -U $POSTGRES_USER --if-exists $POSTGRES_DB"
+    dropdb -U "$POSTGRES_USER" --if-exists "$POSTGRES_DB"
 
 docker exec "$POSTGRES_CONTAINER" \
-    sh -c "createdb -U $POSTGRES_USER $POSTGRES_DB"
+    createdb -U "$POSTGRES_USER" "$POSTGRES_DB"
 
 docker exec -i "$POSTGRES_CONTAINER" \
     psql -U "$POSTGRES_USER" "$POSTGRES_DB" \
@@ -54,7 +57,7 @@ docker exec -i "$POSTGRES_CONTAINER" \
 
 echo "Database restored."
 
-echo "Restarting Drupal container..."
+echo "Starting Drupal container..."
 docker start "$DRUPAL_CONTAINER" >/dev/null
 
 echo

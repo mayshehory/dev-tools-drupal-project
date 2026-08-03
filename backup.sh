@@ -2,23 +2,44 @@
 
 set -e
 
+POSTGRES_CONTAINER="postgres"
+POSTGRES_USER="root"
+POSTGRES_DB="drupal"
+
+DRUPAL_VOLUME="drupal-data"
+
 BACKUP_DIR="./backup"
+DB_BACKUP="$BACKUP_DIR/drupal_db_backup.sql"
+FILES_BACKUP="$BACKUP_DIR/drupal_files_backup.tar.gz"
 
 mkdir -p "$BACKUP_DIR"
 
-echo "Creating database backup..."
+echo "===================================="
+echo "Starting backup..."
+echo "===================================="
 
-docker exec postgres pg_dump -U root drupal > "$BACKUP_DIR/drupal.sql"
+echo "Backing up PostgreSQL database..."
 
-echo "Creating Drupal files backup..."
+docker exec "$POSTGRES_CONTAINER" \
+    sh -c "exec pg_dump -U $POSTGRES_USER $POSTGRES_DB" \
+    > "$DB_BACKUP"
+
+echo "Database backup completed."
+
+echo "Backing up Drupal files..."
 
 docker run --rm \
-    -v drupal-data:/data \
+    -v "$DRUPAL_VOLUME":/volume \
     -v "$(pwd)/backup":/backup \
     alpine \
-    tar czf /backup/drupal-files.tar.gz -C /data .
+    tar czf /backup/drupal_files_backup.tar.gz -C /volume .
+
+echo "Drupal files backup completed."
 
 echo
+echo "===================================="
 echo "Backup completed successfully!"
-echo "Files saved in:"
-echo "$BACKUP_DIR"
+echo "Created:"
+echo " - $DB_BACKUP"
+echo " - $FILES_BACKUP"
+echo "===================================="
